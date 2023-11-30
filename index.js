@@ -5,6 +5,10 @@ const {
   createRole,
   createEmployee,
   updateEmployeeRole,
+  updateManager,
+  viewEmployeesByManager,
+  viewEmployeesByDepartment,
+  deleteEntry,
   connection,
 } = require("./db");
 
@@ -22,6 +26,10 @@ const mainQuestion = [
       "Add a role",
       "Add an employee",
       "Update an employee",
+      "Update manager",
+      "View employees by manager",
+      "View employees by department",
+      "Delete entry",
       "Quit",
     ],
   },
@@ -45,6 +53,15 @@ async function handleAction(action) {
       await createEmployee();
     } else if (action === "Update an employee") {
       await updateEmployeeRole();
+    } else if (action === "Update manager") {
+      await updateManager();
+    } else if (action === "View employees by manager") {
+      await viewEmployeesByManager();
+    } else if (action === "View employees by department") {
+      console.log("Enters" );
+      await viewEmployeesByDepartment();
+    } else if (action === "Delete entry") {
+      await deleteEntry();
     }
   } finally {
     if (action !== "Quit") {

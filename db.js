@@ -321,11 +321,241 @@ const getManagerChoices = () => {
   });
 };
 
+const updateManager = async () => {
+  try {
+    // Fetch the list of employees
+    const employeeChoices = await getEmployeeChoices();
+
+    // Prompt the user to select an employee
+    const employeeAnswer = await inquirer.prompt({
+      type: "list",
+      name: "employee",
+      message: "Choose the employee whose manager you want to update:",
+      choices: employeeChoices,
+    });
+
+    console.log("Selected employee:", employeeAnswer.employee);
+
+    // Fetch the list of managers (including "None" option)
+    const managerChoices = await getManagerChoices();
+
+    // Prompt the user to select a new manager
+    const managerAnswer = await inquirer.prompt({
+      type: "list",
+      name: "manager",
+      message: "Choose the new manager for the employee (or choose 'None'):",
+      choices: managerChoices,
+    });
+
+    console.log("Selected manager:", managerAnswer.manager);
+
+    // Update the employee's manager in the database
+    await new Promise((resolve, reject) => {
+      connection.query(
+        "UPDATE employees SET manager_id = ? WHERE id = ?",
+        [
+          managerAnswer.manager !== "None" ? managerAnswer.manager : null,
+          employeeAnswer.employee,
+        ],
+        (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            console.log("Employee manager updated successfully.");
+            resolve(result);
+          }
+        }
+      );
+    });
+  } catch (error) {
+    console.error("Error:", error.message);
+  }
+};
+
+const viewEmployeesByManager = async () => {
+  try {
+    // Fetch the list of managers
+    const managerChoices = await getManagerChoices();
+
+    // Prompt the user to select a manager
+    const managerAnswer = await inquirer.prompt({
+      type: "list",
+      name: "manager",
+      message: "Select the manager to view their employees:",
+      choices: managerChoices,
+    });
+
+    console.log("Selected manager:", managerAnswer.manager);
+
+    // Fetch and display all employees with the selected manager
+    const employeesByManager = await new Promise((resolve, reject) => {
+      connection.query(
+        "SELECT * FROM employees WHERE manager_id = ?",
+        [managerAnswer.manager !== "None" ? managerAnswer.manager : null],
+        (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+    });
+
+    // Display the list of employees
+    console.log("Employees with the selected manager:");
+    employeesByManager.forEach((employee) => {
+      console.log(`${employee.first_name} ${employee.last_name}`);
+    });
+  } catch (error) {
+    console.error("Error:", error.message);
+  }
+};
+
+// Assuming you have a function to fetch department choices
+const getDepartmentChoices = async () => {
+  return new Promise((resolve, reject) => {
+    connection.query("SELECT id, name FROM departments", (err, result) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(
+          result.map((department) => ({
+            name: department.name,
+            value: department.id,
+          }))
+        );
+      }
+    });
+  });
+};
+
+const viewEmployeesByDepartment = async () => {
+  try {
+    // Fetch the list of departments
+    const departmentChoices = await getDepartmentChoices();
+
+    // Prompt the user to select a department
+    const departmentAnswer = await inquirer.prompt({
+      type: "list",
+      name: "department",
+      message: "Select the department to view its employees:",
+      choices: departmentChoices,
+    });
+
+    console.log("Selected department:", departmentAnswer.department);
+
+    // Fetch and display all employees in the selected department
+    const employeesByDepartment = await new Promise((resolve, reject) => {
+      connection.query(
+        "SELECT * FROM employees WHERE department_id = ?",
+        [departmentAnswer.department],
+        (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+    });
+
+    // Display the list of employees
+    console.log(`Employees in the ${departmentAnswer.department} department:`);
+    employeesByDepartment.forEach((employee) => {
+      console.log(`${employee.first_name} ${employee.last_name}`);
+    });
+  } catch (error) {
+    console.error("Error:", error.message);
+  }
+};
+
+const deleteEntry = async () => {
+  try {
+    // Prompt the user to select the type of record to delete
+    const recordTypeAnswer = await inquirer.prompt({
+      type: "list",
+      name: "recordType",
+      message: "Select the type of record to delete:",
+      choices: ["Department", "Role", "Employee"],
+    });
+
+    console.log(`Selected record type: ${recordTypeAnswer.recordType}`);
+
+    // Fetch and display all records of the selected type
+    const records = await new Promise((resolve, reject) => {
+      connection.query(
+        `SELECT * FROM ${recordTypeAnswer.recordType.toLowerCase()}s`,
+        (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+    });
+
+    // Display the list of records
+    console.log(`All ${recordTypeAnswer.recordType.toLowerCase()}s:`);
+    records.forEach((record) => {
+      console.log(JSON.stringify(record, null, 2));
+    });
+
+    const recordToDeleteAnswer = await inquirer.prompt({
+      type: "list",
+      name: "recordToDelete",
+      message: `Select the ${recordTypeAnswer.recordType.toLowerCase()} to delete:`,
+      choices: records.map((record) => ({
+        name: `${
+          recordTypeAnswer.recordType === "Employee"
+            ? `${record.first_name} ${record.last_name}`
+            : recordTypeAnswer.recordType === "Role"
+            ? record.title
+            : record.name || "Unknown"
+        }`,
+        value: record.id,
+      })),
+    });
+
+    console.log(
+      `Selected ${recordTypeAnswer.recordType.toLowerCase()} to delete: ${
+        recordToDeleteAnswer.recordToDelete
+      }`
+    );
+
+    // Delete the selected record
+    await new Promise((resolve, reject) => {
+      const sql = `DELETE FROM ${recordTypeAnswer.recordType.toLowerCase()}s WHERE id = ?`;
+      console.log("Executing SQL query:", sql);
+
+      connection.query(
+        sql,
+        [recordToDeleteAnswer.recordToDelete],
+        (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            console.log(`${recordTypeAnswer.recordType} deleted successfully.`);
+            resolve(result);
+          }
+        }
+      );
+    });
+  } catch (error) {
+    console.error("Error:", error.message);
+  }
+};
+
 module.exports = {
   viewAllDepartments,
   addDepartment,
   createRole,
   createEmployee,
   updateEmployeeRole,
+  updateManager,
+  viewEmployeesByManager,
+  viewEmployeesByDepartment,
+  deleteEntry,
   connection,
 };
