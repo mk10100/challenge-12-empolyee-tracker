@@ -1,13 +1,22 @@
 const mysql = require("mysql2");
 const inquirer = require("inquirer");
+require("dotenv").config();
 
-const connection = mysql.createConnection({
-  host: "localhost",
-  user: "Mohamed Khalil",
-  password: "1234",
-  database: "employee_manager",
-});
+let connection;
 
+function connectDatabase(connect = true) {
+  if (connect) {
+    connection = mysql.createConnection({
+      host: "localhost",
+      user: process.env.DB_USER,
+      password: process.env.DB_PASS,
+      database: process.env.DB_NAME,
+      port: process.env.DB_PORT,
+    });
+  } else {
+    connection.end();
+  }
+}
 //Department functions
 function viewAllDepartments(table) {
   connection.query(`SELECT * FROM ${table}`, function (err, results, fields) {
@@ -181,16 +190,16 @@ async function createEmployee() {
 
     await new Promise((resolve, reject) => {
       connection.query(
-        "INSERT INTO employees SET ?",
-        {
-          first_name: answers.first_name,
-          last_name: answers.last_name,
-          title: selectedRole.title,
-          salary: selectedRole.salary,
-          role_id: answers.role,
-          department_id: selectedRole.department_id,
-          manager_id: answers.manager !== "None" ? answers.manager : null,
-        },
+        "INSERT INTO employees (first_name, last_name, title, salary, role_id, department_id, manager_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+          answers.first_name,
+          answers.last_name,
+          selectedRole.title,
+          selectedRole.salary,
+          answers.role,
+          selectedRole.department_id,
+          answers.manager !== "None" ? answers.manager : null,
+        ],
         (err, result) => {
           if (err) {
             reject(err);
@@ -254,23 +263,48 @@ const updateEmployeeRole = async () => {
     console.log("Selected role title:", selectedRole.title);
     console.log("Selected role salary:", selectedRole.salary);
 
-    // Update the employee's role, title, and salary in the database
+    // Update the employee's role in the database
     await new Promise((resolve, reject) => {
       connection.query(
-        "UPDATE employees SET role_id = ?, title = ?, salary = ? WHERE id = ?",
-        [
-          roleAnswer.role,
-          selectedRole.title,
-          selectedRole.salary,
-          employeeAnswer.employee,
-        ],
+        "UPDATE employees SET role_id = ? WHERE id = ?",
+        [roleAnswer.role, employeeAnswer.employee],
         (err, result) => {
           if (err) {
             reject(err);
           } else {
-            console.log(
-              "Employee role, title, and salary updated successfully."
-            );
+            console.log("Employee role updated successfully.");
+            resolve(result);
+          }
+        }
+      );
+    });
+
+    // Update the employee's title in the database
+    await new Promise((resolve, reject) => {
+      connection.query(
+        "UPDATE employees SET title = ? WHERE id = ?",
+        [selectedRole.title, employeeAnswer.employee],
+        (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            console.log("Employee title updated successfully.");
+            resolve(result);
+          }
+        }
+      );
+    });
+
+    // Update the employee's salary in the database
+    await new Promise((resolve, reject) => {
+      connection.query(
+        "UPDATE employees SET salary = ? WHERE id = ?",
+        [selectedRole.salary, employeeAnswer.employee],
+        (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            console.log("Employee salary updated successfully.");
             resolve(result);
           }
         }
@@ -557,5 +591,5 @@ module.exports = {
   viewEmployeesByManager,
   viewEmployeesByDepartment,
   deleteEntry,
-  connection,
+  connectDatabase,
 };

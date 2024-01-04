@@ -1,3 +1,6 @@
+const mysql = require("mysql2/promise");
+const fs = require("fs");
+const path = require("path");
 const inquirer = require("inquirer");
 const {
   addDepartment,
@@ -9,10 +12,52 @@ const {
   viewEmployeesByManager,
   viewEmployeesByDepartment,
   deleteEntry,
-  connection,
+  connectDatabase,
 } = require("./db");
+require("dotenv").config();
 
-// TODO: Create an array of questions for user input
+async function createDatabase() {
+  try {
+    const newConnection = await mysql.createConnection({
+      host: "localhost",
+      user: process.env.DB_USER,
+      password: process.env.DB_PASS,
+      port: 3306,
+    });
+    await newConnection.query("CREATE DATABASE IF NOT EXISTS employee_db");
+    console.log("Database created successfully");
+    newConnection.end();
+  } catch (error) {
+    console.error("Error creating database:", error);
+  }
+}
+
+async function executeSchemaQuery() {
+  try {
+    const schemaConnection = await mysql.createConnection({
+      host: "localhost",
+      user: process.env.DB_USER,
+      password: process.env.DB_PASS,
+      database: process.env.DB_NAME,
+      port: 3306,
+    });
+
+    const schemaFilePath = path.join(__dirname, "db", "schema.sql");
+    const schemaQuery = fs.readFileSync(schemaFilePath, "utf8");
+
+    const schemaQueries = schemaQuery.split(";");
+    for (let query of schemaQueries) {
+      if (query.trim() !== "") {
+        await schemaConnection.query(query);
+      }
+    }
+    console.log("Schema query executed successfully");
+    schemaConnection.end();
+  } catch (error) {
+    console.error("Error executing schema query:", error);
+  }
+}
+
 const mainQuestion = [
   {
     type: "list",
@@ -58,24 +103,30 @@ async function handleAction(action) {
     } else if (action === "View employees by manager") {
       await viewEmployeesByManager();
     } else if (action === "View employees by department") {
-      console.log("Enters" );
       await viewEmployeesByDepartment();
     } else if (action === "Delete entry") {
       await deleteEntry();
     }
   } finally {
     if (action !== "Quit") {
-      init();
+      promptLoop();
     } else {
-      connection.end();
+      connectDatabase(false);
     }
   }
 }
 
-function init() {
+async function promptLoop() {
   inquirer.prompt(mainQuestion).then((answers) => {
     handleAction(answers.title);
   });
+}
+
+async function init() {
+  await createDatabase();
+  await executeSchemaQuery();
+  connectDatabase();
+  promptLoop();
 }
 
 init();
